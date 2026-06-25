@@ -1,0 +1,400 @@
+# Agents — A Guided Deep Dive
+
+A hands-on playground for learning how **LLM agents** actually work, by building
+one from scratch. You'll write the agentic loop yourself and understand every
+moving part: tools, the loop, multi-tool routing, step limits, error recovery,
+human-in-the-loop approval, observability, memory, and multi-agent delegation. No
+LangChain, no SDK tool-runners, no framework magic — just enough code to *see* how
+an agent thinks.
+
+This is the sixth of eight repos in the series, and the one where the building blocks converge. The
+first two teach the API calls ([OpenAI](https://github.com/Ailuue/openai-api-deep-dive),
+[Claude](https://github.com/Ailuue/claude-api-deep-dive)); [prompt engineering](https://github.com/Ailuue/prompt-engineering-deep-dive) sharpens how you ask; [RAG](https://github.com/Ailuue/rag-deep-dive) adds
+retrieval; [evals](https://github.com/Ailuue/evals-deep-dive) measures quality. An agent *uses*
+all of it: it calls the API in a loop, its tools can include RAG retrieval, and
+its step-by-step behavior is exactly what you'd evaluate. Tools + loop is the
+pattern under "AI agents," and once you've written it by hand, the frameworks stop
+being magic.
+
+Like its siblings, it's meant to be *walked through*. Each section ends with
+something to run; the first runs **offline and free**. [EXERCISES.md](EXERCISES.md)
+has a predict-then-run prompt for each section.
+
+---
+
+## 0. The one big idea
+
+> **An agent is a loop: the model picks a tool, you run it, you feed the result
+> back — until it's done.**
+
+That's the entire concept. A model on its own can only produce text; give it
+*tools* and a *loop* and it can take actions, observe results, and decide what to
+do next. Everything in this repo — multiple tools, error handling, approval,
+memory, sub-agents — is a small addition to that loop, not a new idea. Hold onto
+it and none of this feels complicated.
+
+---
+
+## 1. Setup (5 minutes)
+
+```bash
+# 1. Create an isolated Python environment
+python3 -m venv .venv
+source .venv/bin/activate          # Windows: .venv\Scripts\activate
+
+# 2. Install dependencies
+pip install -r requirements.txt
+
+# 3. Choose your provider and add your key
+cp .env.example .env
+#    ...then open .env. Set PROVIDER to "openai" or "claude" and paste the key.
+
+# 4. Confirm everything is wired up (makes no API call, costs nothing)
+python check_setup.py
+```
+
+Agents are provider-agnostic, so this repo is too — pick whichever stack you set up
+in the sibling repos with `PROVIDER` in `.env`:
+
+| `PROVIDER` | Chat model | Key needed |
+|------------|-----------|------------|
+| `openai` (default) | OpenAI `gpt-4o-mini` | `OPENAI_API_KEY` |
+| `claude` | Claude `claude-haiku-4-5` | `ANTHROPIC_API_KEY` |
+
+Tool-calling has a genuinely different *shape* per provider (OpenAI's
+`function`/`tool_calls` vs Claude's `tool_use`/`tool_result` blocks). The one file
+that knows the difference is [agent/providers.py](agent/providers.py); the loop and
+everything above it stay identical. That's the whole point — agents are an
+architecture, not a provider feature.
+
+> 💡 **Start before spending anything.** Example 01 is completely offline — it
+> shows what a tool *is* with no key and no cost. The rest make small, cheap calls.
+
+---
+
+## 2. What a tool is
+
+A tool has two faces: to your code it's a plain function; to the model it's just a
+name, a description, and a JSON Schema of inputs. The model never runs anything —
+it only *asks* — and your code decides whether to execute. That gap is where every
+bit of an agent's safety lives.
+
+```bash
+python examples/01_tools.py          # offline
+```
+
+See [agent/tools.py](agent/tools.py) for the toolbox: a safe `calculator`, a
+read-only `search_notes` (over a tiny knowledge base — where a real agent would
+call your RAG pipeline), and `save_note`, which writes a file and is therefore
+flagged **dangerous**. The description and parameter names are the model's only
+clues for when and how to call a tool — they're prompt engineering, not
+afterthoughts.
+
+---
+
+## 3. One tool call
+
+The core mechanic in isolation: hand the model tools and a question, and instead
+of answering it replies "please run `calculator` with `expression='23 * 47'`."
+That's a request — you run it.
+
+```bash
+python examples/02_one_tool_call.py
+```
+
+This does exactly one turn so you can see the request shape clearly (normalized to
+the same `ToolCall` on either provider). It doesn't feed the result back yet —
+that's the loop, next.
+
+---
+
+## 4. The agent loop
+
+Repeat that one turn — run the tool, feed the result back, ask again — until the
+model stops asking. That loop is the agent.
+
+```bash
+python examples/03_agent_loop.py
+```
+
+`run_agent` in [agent/loop.py](agent/loop.py) is about twenty lines. Watch the
+trace: given a multi-step question, the model chains calls, using each result to
+decide the next — something a single call can't do. **This is the example to
+really understand; everything after it is a small addition.**
+
+---
+
+## 5. Multiple tools — the model chooses
+
+Give the agent more than one tool and it routes each sub-task to the right one and
+chains them.
+
+```bash
+python examples/04_multiple_tools.py
+```
+
+Asked "what does the Plus plan cost per year?", it calls `search_notes` for the
+price, then `calculator` to multiply — no hard-coded plan. The tool *descriptions*
+are what make that routing reliable.
+
+---
+
+## 6. Control — step limits and error recovery
+
+An unsupervised loop needs guardrails. Two essential ones are built into
+`run_agent`:
+
+```bash
+python examples/05_limits_and_errors.py
+```
+
+- **`max_steps`** — a hard ceiling, so a confused agent stops and says so instead
+  of looping forever.
+- **Error recovery** — when a tool raises, the error text goes back to the model
+  *as the result*, so it can adapt instead of crashing the program.
+
+These two are the difference between a toy loop and one you'd run unattended.
+
+---
+
+## 7. Human-in-the-loop approval
+
+Some actions have consequences (writing files, sending email, spending money). Mark
+those tools `dangerous=True` and pass an `approve` callback; the loop asks before
+running them.
+
+```bash
+python examples/06_human_in_the_loop.py     # interactive
+```
+
+`save_note` is dangerous, so you're prompted; the calculator and search run freely.
+Deny the call and the agent adapts — a denial is just another tool result. Which
+tools are "dangerous" is your policy, declared on the tool.
+
+---
+
+## 8. Observability — see what it did
+
+An agent makes its own decisions, so when it misbehaves you need the trace: which
+tool, what arguments, what result, at each step.
+
+```bash
+python examples/07_observability.py
+```
+
+You've seen the live `Tracer`; this also shows the same steps after the fact from
+`result.steps` — the structured record you'd log in production and feed to an eval
+(see the [evals repo](https://github.com/Ailuue/evals-deep-dive)) to score whether the agent called the
+right tools in a sensible order.
+
+---
+
+## 9. Memory — remembering the conversation
+
+The API is stateless (the same lesson as the sibling repos): "memory" is just you
+re-sending the growing message list. `run_agent` takes an optional `history` list
+and appends to it in place, so passing the same list across turns gives the agent
+memory.
+
+```bash
+python examples/08_memory.py          # interactive REPL
+```
+
+Ask it to "search the plans," then "which is cheapest?" — the follow-up only works
+because the earlier turn is still in the history you resend.
+
+---
+
+## 10. Multi-agent — agents that call agents
+
+As tasks grow, one agent with twenty tools gets unfocused. Delegate instead. A
+sub-agent is not a new mechanism — it's a tool whose function happens to run its
+own loop, with its own prompt and toolset.
+
+```bash
+python examples/09_multi_agent.py
+```
+
+An orchestrator delegates factual questions to a `research` sub-agent (tools:
+`search_notes`) and does math itself. To the orchestrator, `research` is just a
+tool; underneath, it's a whole second loop. That's how large agent systems are
+built — focused agents calling each other through the same tool interface.
+
+---
+
+## 11. The capstone: `agent.py`
+
+Everything assembled into a CLI agent you can actually use: the full toolbox, the
+loop with a step cap, approval for the dangerous tool, an optional trace, and a
+memory-keeping interactive mode.
+
+```bash
+# One-off task
+python hands_on/agent.py "What's a year of the Plus plan, and is offline editing included?"
+
+# Watch every step
+python hands_on/agent.py "What is 19% of 240?" --trace
+
+# Interactive chat with memory (type 'quit' to exit)
+python hands_on/agent.py
+
+# Save notes without being prompted each time
+python hands_on/agent.py "Save a note titled 'todo' with body 'ship the repo'" --yes
+```
+
+Read [hands_on/agent.py](hands_on/agent.py) — it's just the library wired to a CLI.
+**Suggested exercise:** add a new tool to `agent/tools.py` (say `word_count`),
+register it in `default_tools()`, and watch the agent pick it up. Adding a
+capability is: write a function, describe it, register it.
+
+---
+
+## Bonus — MCP: a tool you didn't ship with
+
+Every example so far imported its tools straight from `agent/tools.py`. Real
+agents often can't: the tool lives in another team's service, a vendor's product,
+or a process in another language. **MCP (the Model Context Protocol)** is the
+standard that makes that work — a tool *server* advertises what it offers, and the
+agent *client* discovers and calls those tools over one agreed wire format, with
+no bespoke glue per tool. It's the same idea as Section 2 (*a tool is a name, a
+description, and a JSON Schema*), now spoken over a protocol instead of an import.
+
+This repo ships a real, from-scratch MCP server and client — JSON-RPC over stdio,
+the actual `tools/list` / `tools/call` methods, no SDK — so you can see the
+protocol rather than import it. It's fully offline (no model, no key):
+
+```bash
+python examples/10_mcp.py
+```
+
+The payoff is the conversion step in the client: each remote tool descriptor
+becomes an ordinary `Tool` object, so an MCP-served tool drops into the loop from
+Section 4 unchanged — the agent can't tell a local function from a tool served
+across the world. [agent/mcp_server.py](agent/mcp_server.py) is the server (it
+serves the very same `calculator` and `search_notes` functions, now over the
+wire); [examples/10_mcp.py](examples/10_mcp.py) is the client.
+
+In production you'd use the official `mcp` SDK and a real transport (HTTP/SSE),
+and your provider can often skip the client entirely: the Claude API connects to
+remote MCP servers for you (its MCP connector), and the OpenAI stack has an
+equivalent. The protocol shape you just built by hand is exactly what those use.
+
+---
+
+## Where to go next
+
+You've built a real agent from scratch. The frontier is more of the same loop, with
+more capability and rigor:
+
+- **MCP at scale** — you built the protocol by hand above; the official `mcp` SDK,
+  remote (HTTP/SSE) transports, auth, and provider-side connectors are the
+  production version.
+- **Managed / hosted agents** — let the provider run the loop and host a sandbox
+  for tool execution (Anthropic's Managed Agents, OpenAI's Agents/Assistants).
+- **Server-side & computer-use tools** — web search, code execution, and driving a
+  real GUI, where the provider runs the tool for you.
+- **Planning & reflection** — having the agent draft a plan, critique its own work,
+  or retry failed sub-tasks, on top of the basic loop.
+- **Production hardening** — sandboxing tool execution, tighter permission
+  policies, budgets/timeouts, retries, and structured logging/tracing.
+- **Evaluating agents** — scoring trajectories (right tools, right order, no wasted
+  steps), not just final answers — exactly what the [evals repo](https://github.com/Ailuue/evals-deep-dive)
+  is for.
+- **SDK tool-runners** — now that you've written the loop by hand, the official
+  SDKs' tool-runner helpers will read as conveniences, not magic.
+
+Each is a variation on the one idea you started with: the model picks a tool, you
+run it, you feed the result back.
+
+---
+
+## From teaching code to production
+
+An agent is the riskiest thing to put in production: it loops, calls tools, and
+spends on its own. Every shortcut that's fine in a demo becomes a liability once
+it runs unattended:
+
+| This repo's teaching shortcut | In production |
+|-------------------------------|---------------|
+| The loop runs until it's done | A **cost budget** *and* step ceiling per run, so a stuck loop can't rack up a bill |
+| Section 8's observability is `print()` | A **structured trace** with a **span per step** — which tool, which args, how long, how many tokens |
+| Tool/model errors handled inline (Section 6) | **Retries + backoff** and a **circuit breaker** around every model and tool call |
+| Tools trust their arguments | **Guardrails** on tool inputs and outputs — the agent is acting on possibly-injected text |
+| The system prompt is a literal in the script | A **versioned prompt** promoted only past an **eval gate** on agent behavior |
+| Every step re-calls the model | A **response cache** for repeated sub-calls |
+
+These shortcuts are right for learning and wrong for production. All seven
+concerns — observability, cost, reliability, caching, guardrails, prompt
+versioning, and eval gates — are built from scratch and wired into one running
+app in **[Production](https://github.com/Ailuue/production-deep-dive)** (#8 in the
+series). It runs **offline on a mock provider**, so you can see the whole ops
+machinery with no key and no cost.
+
+---
+
+## File map
+
+```
+check_setup.py              ← run first: verifies Python, packages, provider, key
+README.md                   ← this guide
+EXERCISES.md                ← predict-then-run prompts, one per section
+agent/                      ← the from-scratch agent library (read it!)
+  tools.py                  ← what a tool is + the safe default toolbox
+  providers.py              ← the ONLY provider-specific file: normalizes a turn
+  loop.py                   ← run_agent (the loop) + Tracer + AgentResult
+  mcp_server.py             ← a from-scratch MCP tool server (JSON-RPC over stdio)
+hands_on/
+  agent.py                  ← capstone: a CLI agent (one-off or interactive)
+examples/
+  01_tools.py               ← what a tool is (offline, no key)
+  02_one_tool_call.py       ← one turn: the model requests a tool call
+  03_agent_loop.py          ← the loop — the whole idea
+  04_multiple_tools.py      ← the model routes between tools
+  05_limits_and_errors.py   ← max_steps + feeding errors back
+  06_human_in_the_loop.py   ← approval gate for dangerous tools
+  07_observability.py       ← tracing each step, live and after the fact
+  08_memory.py              ← multi-turn memory via a shared history
+  09_multi_agent.py         ← an orchestrator delegating to a sub-agent
+  10_mcp.py                 ← use a tool over MCP — offline client + server, no key
+```
+
+(`workspace/` is created by the `save_note` tool and is git-ignored.)
+
+---
+
+## Troubleshooting
+
+Run `python check_setup.py` first — it catches most problems. Then, by symptom:
+
+| What you see | What it means / the fix |
+|--------------|-------------------------|
+| `PROVIDER=... needs ... in .env` | The active stack is missing its key. Set `PROVIDER` and the matching key in `.env`. |
+| `ModuleNotFoundError` (openai / anthropic / rich) | Dependencies aren't installed or the venv isn't active. `source .venv/bin/activate` then `pip install -r requirements.txt`. |
+| The agent answers math wrong / makes things up | It's not using its tools. Strengthen the system prompt ("use the calculator for arithmetic; don't guess product facts") — tool *descriptions and instructions* drive tool use. |
+| "(stopped: reached the step limit...)" | The task needed more steps than `max_steps`. Raise it (`--max-steps` on the capstone), or simplify the task. |
+| It runs a dangerous tool without asking | You passed no `approve` callback (or used `--yes`). Approval only triggers for tools marked `dangerous=True` when an `approve` callback is supplied. |
+| `SyntaxError` / odd type errors on startup | You're likely on Python 3.9 or older; this repo needs 3.10+. `check_setup.py` confirms your version. |
+
+Still stuck? Every file is small and self-contained — open it, read the docstring
+at the top, and run it directly. The loop in `agent/loop.py` is the whole story.
+
+---
+
+## The series
+
+This is one of eight standalone, hands-on deep dives into building with LLM APIs.
+Each one stands on its own — its own setup, examples, and capstone — and they all
+share the same house style: provider-agnostic, built from scratch (no
+frameworks), offline-first examples, and a real capstone. Do them in any order;
+this sequence builds naturally:
+
+1. [OpenAI API](https://github.com/Ailuue/openai-api-deep-dive) — the API from zero
+2. [Claude API](https://github.com/Ailuue/claude-api-deep-dive) — the same ideas, the Anthropic way
+3. [Prompt Engineering](https://github.com/Ailuue/prompt-engineering-deep-dive) — shape model behavior with better prompts (zero/few-shot, chain-of-thought, roles)
+4. [RAG](https://github.com/Ailuue/rag-deep-dive) — answer questions over your own documents
+5. [Evals](https://github.com/Ailuue/evals-deep-dive) — measure whether a change actually helps
+6. [Agents](https://github.com/Ailuue/agents-deep-dive) — give a model tools and a loop so it can act
+7. [Prompt Injection & Guardrails](https://github.com/Ailuue/prompt-injection-deep-dive) — attack and defend all of the above
+8. [Production](https://github.com/Ailuue/production-deep-dive) — operate one app end to end: observability, cost, reliability, caching, guardrails, prompt versioning, eval gates
+
+**You are here: #6 — Agents.**
