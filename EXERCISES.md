@@ -189,6 +189,56 @@ extensibility story.
 
 ---
 
+## Going further — three more agent patterns
+
+**Recall (`11`).** You can solve a support task with a hard-coded workflow or with
+the agent loop. When should you *not* reach for an agent?
+
+<details><summary>▸ Answer</summary>
+
+When you can already **draw the flowchart**. If the steps are known, a workflow
+(classify → route → handle, orchestrated in code) is cheaper, more predictable, and
+easier to test. An agent earns its cost and unpredictability only when the path is
+genuinely open-ended.
+</details>
+
+**Recall (`12`).** Planning and reflection are both extra LLM passes around the loop.
+What does each buy you, and what's the weakness of self-reflection?
+
+<details><summary>▸ Answer</summary>
+
+**Plan** (before) keeps a multi-step task from dropping a sub-goal. **Reflect**
+(after) catches half-answers and slips, then revises. The weakness: a model grading
+itself is fallible — the strong version grounds the critic in a real check (tests, a
+schema, a verifier), as in the prompt-engineering "reflexion" lesson.
+</details>
+
+**Predict (`13`).** The model asks for three independent `get_weather` calls in one
+turn. Why does running them concurrently help, and roughly how much?
+
+<details><summary>▸ Answer</summary>
+
+Independent calls don't depend on each other, so there's no reason to wait — run them
+concurrently and the turn finishes in the time of the **slowest** call, not the
+**sum**. Three ~0.8s calls: ~2.4s sequential vs ~0.8s parallel (~3×). The final
+answer is a normal completion, so you can stream it on top.
+</details>
+
+**Recall (`14`).** Example 13 streams the final answer; example 14 streams every
+turn. What has to change in the loop, and what's the one fiddly part of streaming a
+turn that *also* calls a tool?
+
+<details><summary>▸ Answer</summary>
+
+Almost nothing changes — you swap `run_turn` for `stream_turn` and print the text
+deltas via a callback; the rest of the loop (run tools, feed results back, repeat) is
+identical. The fiddly part is reassembling the tool call: OpenAI streams the
+`arguments` as JSON *fragments* you must concatenate by index before you can parse
+them. That lives in `agent/providers.py` so the loop stays clean.
+</details>
+
+---
+
 ### Where to take it next
 
 Invent your own. Wire one of your real functions in as a tool — something that
