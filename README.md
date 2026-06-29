@@ -7,7 +7,7 @@ human-in-the-loop approval, observability, memory, and multi-agent delegation. N
 LangChain, no SDK tool-runners, no framework magic — just enough code to *see* how
 an agent thinks.
 
-This is the sixth of eight repos in the series, and the one where the building blocks converge. The
+This is the sixth of eight core repos in the series, and the one where the building blocks converge. The
 first two teach the API calls ([OpenAI](https://github.com/Ailuue/openai-api-deep-dive),
 [Claude](https://github.com/Ailuue/claude-api-deep-dive)); [prompt engineering](https://github.com/Ailuue/prompt-engineering-deep-dive) sharpens how you ask; [RAG](https://github.com/Ailuue/rag-deep-dive) adds
 retrieval; [evals](https://github.com/Ailuue/evals-deep-dive) measures quality. An agent *uses*
@@ -249,6 +249,52 @@ capability is: write a function, describe it, register it.
 
 ---
 
+## Going further — four more agent patterns
+
+The loop is the core; these are the patterns you layer on it in real systems.
+
+### Workflows vs. agents
+"Agent" isn't always the answer. If you can draw the flowchart, build a **workflow** —
+fixed steps you orchestrate in code (classify → route → handle). It's cheaper, more
+predictable, and easier to test. Reach for an **agent** (the model drives the loop)
+only when the path genuinely can't be known up front. The example does one support
+task both ways.
+```bash
+python examples/11_workflows_vs_agents.py
+```
+
+### Planning & reflection
+Two cheap wrappers around the loop that boost reliability on multi-part tasks: ask
+the model to write a short **plan** before it acts (keeps long tasks on track), and
+run a **reflection** pass after (a critic catches half-answers, then revises). Best
+when the critic is grounded in a real check — see the prompt-engineering "reflexion"
+lesson and the evals dive.
+```bash
+python examples/12_planning_reflection.py
+```
+
+### Parallel tool calls & streaming
+When the model requests several *independent* tool calls in one turn, run them
+**concurrently** — the turn costs the slowest call, not the sum. And the final answer
+is an ordinary completion, so **stream** it token by token for instant, responsive
+output. The example times sequential vs. parallel execution, then streams the answer.
+```bash
+python examples/13_parallel_and_streaming.py
+```
+
+### Streaming *inside* the loop
+Example 13 streams the *final* answer; this streams *every* turn — including the ones
+that request tools — so the user watches the agent narrate ("let me look that up…")
+between tool calls instead of staring at a spinner. The loop is unchanged; you just
+swap `run_turn` for `stream_turn`, which prints text deltas live and still hands back
+the normalized tool calls (reassembling streamed tool-call fragments is the one fiddly
+bit, kept in `agent/providers.py`). This is the pattern most production assistants use.
+```bash
+python examples/14_streaming_tool_loop.py
+```
+
+---
+
 ## Bonus — MCP: a tool you didn't ship with
 
 Every example so far imported its tools straight from `agent/tools.py`. Real
@@ -356,6 +402,10 @@ examples/
   08_memory.py              ← multi-turn memory via a shared history
   09_multi_agent.py         ← an orchestrator delegating to a sub-agent
   10_mcp.py                 ← use a tool over MCP — offline client + server, no key
+  11_workflows_vs_agents.py ← when to hard-code a workflow vs. let the model drive
+  12_planning_reflection.py ← plan before acting; reflect & revise after
+  13_parallel_and_streaming.py ← run independent tool calls concurrently; stream the answer
+  14_streaming_tool_loop.py    ← stream every turn (incl. tool turns), not just the final answer
 ```
 
 (`workspace/` is created by the `save_note` tool and is git-ignored.)
@@ -382,7 +432,7 @@ at the top, and run it directly. The loop in `agent/loop.py` is the whole story.
 
 ## The series
 
-This is one of eight standalone, hands-on deep dives into building with LLM APIs.
+This is one of thirteen standalone, hands-on deep dives into building with LLM APIs — eight core, plus five bonus dives.
 Each one stands on its own — its own setup, examples, and capstone — and they all
 share the same house style: provider-agnostic, built from scratch (no
 frameworks), offline-first examples, and a real capstone. Do them in any order;
@@ -396,5 +446,13 @@ this sequence builds naturally:
 6. [Agents](https://github.com/Ailuue/agents-deep-dive) — give a model tools and a loop so it can act
 7. [Prompt Injection & Guardrails](https://github.com/Ailuue/prompt-injection-deep-dive) — attack and defend all of the above
 8. [Production](https://github.com/Ailuue/ai-in-production-deep-dive) — operate one app end to end: observability, cost, reliability, caching, guardrails, prompt versioning, eval gates
+
+**Bonus dives** — standalone, slotting in where they're most useful:
+
+- [Context Engineering](https://github.com/Ailuue/context-engineering-deep-dive) — manage what's in the window: memory, compaction, assembly
+- [Multimodal](https://github.com/Ailuue/multimodal-deep-dive) — images & audio, not just text
+- [Fine-tuning](https://github.com/Ailuue/fine-tuning-deep-dive) — teach a model new behavior by example
+- [MCP](https://github.com/Ailuue/mcp-deep-dive) — serve tools, data & prompts to any LLM over a standard protocol
+- [Local Models](https://github.com/Ailuue/local-models-deep-dive) — run open-weight models on your own machine
 
 **You are here: #6 — Agents.**
