@@ -161,6 +161,83 @@ def run_turn(system: str, history: list, tool_schema: list) -> Turn:
     raise ValueError(f"Unknown PROVIDER={p!r}.")
 
 
+def stream_turn(system: str, history: list, tool_schema: list, on_text=None) -> Turn:
+    """Like `run_turn`, but STREAM the assistant's text as it's generated.
+
+    Calls `on_text(piece)` for each text delta so the caller can print tokens live,
+    then returns the same normalized `Turn` (text + any tool calls + the message to
+    append). This is what lets you stream *inside* the loop — the user watches the
+    agent's words appear even on a turn that ends in a tool call, not just on the
+    final answer.
+
+    The provider-specific fiddliness lives here, as always: OpenAI streams tool
+    calls as `arguments` fragments you reassemble by index; Claude streams text
+    deltas and hands you the finished tool-use blocks in the final message.
+    """
+    p = provider_name()
+    on_text = on_text or (lambda _piece: None)
+
+    if p == "openai":
+        messages = [{"role": "system", "content": system}, *history]
+        stream = _openai_client().chat.completions.create(
+            model=_OPENAI_CHAT, messages=messages, tools=tool_schema or None, stream=True
+        )
+        text_parts: list[str] = []
+        acc: dict[int, dict] = {}  # tool calls arrive in fragments, keyed by index
+        for chunk in stream:
+            delta = chunk.choices[0].delta
+            if delta.content:
+                text_parts.append(delta.content)
+                on_text(delta.content)
+            for tcd in delta.tool_calls or []:
+                slot = acc.setdefault(tcd.index, {"id": "", "name": "", "args": ""})
+                if tcd.id:
+                    slot["id"] = tcd.id
+                if tcd.function and tcd.function.name:
+                    slot["name"] += tcd.function.name
+                if tcd.function and tcd.function.arguments:
+                    slot["args"] += tcd.function.arguments
+        calls, raw_tool_calls = [], []
+        for idx in sorted(acc):
+            slot = acc[idx]
+            try:
+                args = json.loads(slot["args"] or "{}")
+            except json.JSONDecodeError:
+                args = {}
+            calls.append(ToolCall(id=slot["id"], name=slot["name"], arguments=args))
+            raw_tool_calls.append({
+                "id": slot["id"], "type": "function",
+                "function": {"name": slot["name"], "arguments": slot["args"] or "{}"},
+            })
+        text = "".join(text_parts)
+        raw_assistant: dict = {"role": "assistant", "content": text or None}
+        if raw_tool_calls:
+            raw_assistant["tool_calls"] = raw_tool_calls
+        return Turn(text=text or None, tool_calls=calls, raw_assistant=raw_assistant)
+
+    if p == "claude":
+        with _anthropic_client().messages.stream(
+            model=_CLAUDE_CHAT, max_tokens=1024, system=system, messages=history, tools=tool_schema
+        ) as stream:
+            for event in stream:
+                if event.type == "content_block_delta" and event.delta.type == "text_delta":
+                    on_text(event.delta.text)
+            final = stream.get_final_message()
+        calls, text_parts = [], []
+        for block in final.content:
+            if block.type == "tool_use":
+                calls.append(ToolCall(id=block.id, name=block.name, arguments=dict(block.input)))
+            elif block.type == "text":
+                text_parts.append(block.text)
+        return Turn(
+            text="".join(text_parts) or None,
+            tool_calls=calls,
+            raw_assistant={"role": "assistant", "content": final.content},
+        )
+
+    raise ValueError(f"Unknown PROVIDER={p!r}.")
+
+
 def format_tool_results(results: list[tuple[str, str]]) -> list:
     """Turn (tool_call_id, result_text) pairs into provider-native messages.
 
