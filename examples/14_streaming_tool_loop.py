@@ -58,7 +58,7 @@ def streaming_agent(system: str, question: str, tools: list, max_steps: int = 6)
         print(f"\n[turn {step + 1}] ", end="", flush=True)
         turn = providers.stream_turn(system, history, schema, on_text=lambda piece: print(piece, end="", flush=True))
         print()  # newline after the streamed text
-        history.append(turn.raw_assistant)
+        history.append(turn.raw_assistant)  # type: ignore[arg-type]
 
         if not turn.tool_calls:
             return turn.text or ""
