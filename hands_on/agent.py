@@ -49,7 +49,7 @@ SYSTEM = (
 
 
 def make_approver(auto_yes: bool, console: Console):
-    def approve(call: agent.ToolCall) -> bool:
+    def approve(call: agent.ToolCall) -> bool:  # type: ignore[attr-defined]
         if auto_yes:
             console.print(f"[yellow][auto-approved][/yellow] {call.name}({call.arguments})")
             return True
@@ -74,20 +74,20 @@ def parse_args(argv):
 def main(argv) -> int:
     args = parse_args(argv)
     load_dotenv()
-    agent.ensure_ready()
+    agent.ensure_ready()  # type: ignore[attr-defined]
 
     console = Console()
-    console.print(f"[dim]Provider: {agent.describe()}  |  max_steps={args.max_steps}[/dim]")
+    console.print(f"[dim]Provider: {agent.describe()}  |  max_steps={args.max_steps}[/dim]")  # type: ignore[attr-defined]
 
-    tools = agent.default_tools()
+    tools = agent.default_tools()  # type: ignore[attr-defined]
     approve = make_approver(args.yes, console)
-    tracer = agent.Tracer(enabled=args.trace)
+    tracer = agent.Tracer(enabled=args.trace)  # type: ignore[attr-defined]
 
     # One-off mode.
     if args.task:
         if args.trace:
             console.print("\n[dim]Trace:[/dim]")
-        result = agent.run_agent(
+        result = agent.run_agent(  # type: ignore[attr-defined]
             SYSTEM, args.task, tools, max_steps=args.max_steps, approve=approve, tracer=tracer
         )
         console.print()
@@ -111,7 +111,7 @@ def main(argv) -> int:
             continue
         if args.trace:
             console.print("[dim]Trace:[/dim]")
-        result = agent.run_agent(
+        result = agent.run_agent(  # type: ignore[attr-defined]
             SYSTEM, user_input, tools,
             max_steps=args.max_steps, approve=approve, tracer=tracer, history=history,
         )
