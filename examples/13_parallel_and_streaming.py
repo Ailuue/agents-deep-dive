@@ -71,7 +71,7 @@ def run_one_turn():
     history = [providers.user_message(QUESTION)]
     schema = providers.to_tool_schema([WEATHER])
     turn = providers.run_turn(SYSTEM, history, schema)
-    history.append(turn.raw_assistant)
+    history.append(turn.raw_assistant)  # type: ignore[arg-type]
     return turn.tool_calls, history
 
 
