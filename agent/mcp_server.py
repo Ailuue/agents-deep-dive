@@ -79,7 +79,7 @@ def handle(request: dict) -> dict | None:
         params = request.get("params") or {}
         name = params.get("name")
         arguments = params.get("arguments") or {}
-        entry = _TOOLS.get(name)
+        entry = _TOOLS.get(name or "")
         if entry is None:
             return _error(request_id, -32602, f"unknown tool {name!r}")
         _, func = entry
