@@ -127,7 +127,7 @@ def run_turn(system: str, history: list, tool_schema: list) -> Turn:
     if p == "openai":
         messages = [{"role": "system", "content": system}, *history]
         resp = _openai_client().chat.completions.create(
-            model=_OPENAI_CHAT, messages=messages, tools=tool_schema or None
+            model=_OPENAI_CHAT, messages=messages, tools=tool_schema or None  # type: ignore[arg-type]
         )
         msg = resp.choices[0].message
         calls = []
@@ -179,8 +179,8 @@ def stream_turn(system: str, history: list, tool_schema: list, on_text=None) -> 
 
     if p == "openai":
         messages = [{"role": "system", "content": system}, *history]
-        stream = _openai_client().chat.completions.create(
-            model=_OPENAI_CHAT, messages=messages, tools=tool_schema or None, stream=True
+        stream = _openai_client().chat.completions.create(  # type: ignore[call-overload]
+            model=_OPENAI_CHAT, messages=messages, tools=tool_schema or None, stream=True  # type: ignore[arg-type]
         )
         text_parts: list[str] = []
         acc: dict[int, dict] = {}  # tool calls arrive in fragments, keyed by index
