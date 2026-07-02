@@ -22,9 +22,8 @@ import sys
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from dotenv import load_dotenv
-
 import agent
+from dotenv import load_dotenv
 
 load_dotenv()
 agent.ensure_ready()
@@ -36,11 +35,17 @@ SYSTEM = (
     "arithmetic."
 )
 
-question = sys.argv[1] if len(sys.argv) > 1 else "How much does the Plus plan cost for a full year?"
+question = (
+    sys.argv[1]
+    if len(sys.argv) > 1
+    else "How much does the Plus plan cost for a full year?"
+)
 print(f"Question: {question}\n")
 print("Trace:")
 
-result = agent.run_agent(SYSTEM, question, [agent.CALCULATOR, agent.SEARCH_NOTES], tracer=agent.Tracer())
+result = agent.run_agent(
+    SYSTEM, question, [agent.CALCULATOR, agent.SEARCH_NOTES], tracer=agent.Tracer()
+)
 
 print(f"\nFinal answer: {result.answer}")
 tools_used = ", ".join(sorted({s.tool for s in result.steps})) or "none"
