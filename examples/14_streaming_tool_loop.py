@@ -27,10 +27,9 @@ import sys
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from dotenv import load_dotenv
-
 import agent
 from agent import providers
+from dotenv import load_dotenv
 
 load_dotenv()
 agent.ensure_ready()
@@ -56,7 +55,12 @@ def streaming_agent(system: str, question: str, tools: list, max_steps: int = 6)
     for step in range(max_steps):
         # Stream this turn's text live; tool calls come back normalized as usual.
         print(f"\n[turn {step + 1}] ", end="", flush=True)
-        turn = providers.stream_turn(system, history, schema, on_text=lambda piece: print(piece, end="", flush=True))
+        turn = providers.stream_turn(
+            system,
+            history,
+            schema,
+            on_text=lambda piece: print(piece, end="", flush=True),
+        )
         print()  # newline after the streamed text
         history.append(turn.raw_assistant)  # type: ignore[arg-type]
 
