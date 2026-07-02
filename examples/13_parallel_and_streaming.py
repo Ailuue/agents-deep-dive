@@ -30,16 +30,18 @@ from concurrent.futures import ThreadPoolExecutor
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from dotenv import load_dotenv
-
 import agent
 from agent import providers
+from dotenv import load_dotenv
 
 load_dotenv()
 agent.ensure_ready()
 print(f"Provider: {agent.describe()}\n")
 
-MODELS = {"openai": "gpt-4o-mini", "claude": "claude-haiku-4-5"}  # mirrors agent/providers.py
+MODELS = {
+    "openai": "gpt-4o-mini",
+    "claude": "claude-haiku-4-5",
+}  # mirrors agent/providers.py
 
 
 # --- A deliberately SLOW tool, so the parallel speedup is visible. ------------
@@ -60,8 +62,10 @@ WEATHER = agent.Tool(
     func=slow_weather,
 )
 
-SYSTEM = ("You are a travel assistant. The user names several cities; call get_weather "
-          "for EACH city (all of them) and then summarize.")
+SYSTEM = (
+    "You are a travel assistant. The user names several cities; call get_weather "
+    "for EACH city (all of them) and then summarize."
+)
 QUESTION = "What's the weather in Paris, Tokyo, and Cairo right now? Summarize in one line each."
 
 
@@ -77,6 +81,7 @@ def run_one_turn():
 
 def execute(calls, parallel: bool):
     """Run the requested tool calls, sequentially or concurrently; return results."""
+
     def run(call):
         return (call.id, slow_weather(**call.arguments))
 
@@ -91,6 +96,7 @@ def stream_final(system: str, history: list):
     name = providers.provider_name()
     if name == "openai":
         from openai import OpenAI
+
         stream = OpenAI().chat.completions.create(
             model=MODELS["openai"],
             messages=[{"role": "system", "content": system}, *history],
@@ -102,6 +108,7 @@ def stream_final(system: str, history: list):
                 print(piece, end="", flush=True)
     else:  # claude
         import anthropic
+
         with anthropic.Anthropic().messages.stream(
             model=MODELS["claude"], max_tokens=400, system=system, messages=history
         ) as s:
@@ -113,18 +120,28 @@ def stream_final(system: str, history: list):
 if __name__ == "__main__":
     print(f"Question: {QUESTION}\n")
     calls, history = run_one_turn()
-    print(f"The model requested {len(calls)} tool call(s) in one turn: "
-          f"{', '.join(c.arguments.get('city', '?') for c in calls)}\n")
+    print(
+        f"The model requested {len(calls)} tool call(s) in one turn: "
+        f"{', '.join(c.arguments.get('city', '?') for c in calls)}\n"
+    )
 
     if len(calls) < 2:
-        print("(The model didn't fan out this run — parallel speedup needs ≥2 independent\n"
-              " calls in one turn. Re-run, or try the other provider.)")
+        print(
+            "(The model didn't fan out this run — parallel speedup needs ≥2 independent\n"
+            " calls in one turn. Re-run, or try the other provider.)"
+        )
 
     # 1) Time sequential vs. parallel execution of the SAME calls.
-    t0 = time.time(); execute(calls, parallel=False); seq = time.time() - t0
-    t0 = time.time(); results = execute(calls, parallel=True); par = time.time() - t0
+    t0 = time.time()
+    execute(calls, parallel=False)
+    seq = time.time() - t0
+    t0 = time.time()
+    results = execute(calls, parallel=True)
+    par = time.time() - t0
     print(f"sequential tool execution: {seq:.1f}s")
-    print(f"parallel tool execution:   {par:.1f}s   ->  ~{(seq / par) if par else 1:.1f}x faster\n")
+    print(
+        f"parallel tool execution:   {par:.1f}s   ->  ~{(seq / par) if par else 1:.1f}x faster\n"
+    )
 
     # 2) Feed the results back, then STREAM the final answer.
     history += providers.format_tool_results(results)
