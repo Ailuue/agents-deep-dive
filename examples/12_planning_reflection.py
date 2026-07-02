@@ -30,10 +30,9 @@ import sys
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from dotenv import load_dotenv
-
 import agent
 from agent import providers
+from dotenv import load_dotenv
 
 load_dotenv()
 agent.ensure_ready()
@@ -66,8 +65,11 @@ def reflect(task: str, answer: str) -> tuple[bool, str]:
 
 
 if __name__ == "__main__":
-    task = (sys.argv[1] if len(sys.argv) > 1
-            else "What does the Plus plan cost per year, and how many notes does the Free plan allow?")
+    task = (
+        sys.argv[1]
+        if len(sys.argv) > 1
+        else "What does the Plus plan cost per year, and how many notes does the Free plan allow?"
+    )
     print(f"Task: {task}\n")
 
     # 1) PLAN
@@ -75,9 +77,11 @@ if __name__ == "__main__":
     print("Plan:\n" + the_plan + "\n")
 
     # 2) EXECUTE against the plan, using the tool loop.
-    system = ("You are a careful assistant. Follow the given plan. Use search_notes for "
-              "product facts and the calculator for arithmetic — never guess at numbers.\n\n"
-              f"PLAN:\n{the_plan}")
+    system = (
+        "You are a careful assistant. Follow the given plan. Use search_notes for "
+        "product facts and the calculator for arithmetic — never guess at numbers.\n\n"
+        f"PLAN:\n{the_plan}"
+    )
     print("Execution trace:")
     result = agent.run_agent(system, task, TOOLS, tracer=agent.Tracer())
     answer = result.answer
@@ -88,8 +92,13 @@ if __name__ == "__main__":
     print(f"Reflection: {critique}")
     if not good:
         print("\nRevising based on the critique...\n")
-        revise_system = system + f"\n\nA reviewer noted: {critique}\nProduce a corrected, complete answer."
-        answer = agent.run_agent(revise_system, task, TOOLS, tracer=agent.Tracer()).answer
+        revise_system = (
+            system
+            + f"\n\nA reviewer noted: {critique}\nProduce a corrected, complete answer."
+        )
+        answer = agent.run_agent(
+            revise_system, task, TOOLS, tracer=agent.Tracer()
+        ).answer
 
     print(f"\nFinal answer: {answer}")
     print(
