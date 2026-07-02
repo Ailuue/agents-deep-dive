@@ -32,10 +32,9 @@ import sys
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from dotenv import load_dotenv
-
 import agent
 from agent import providers
+from dotenv import load_dotenv
 
 load_dotenv()
 agent.ensure_ready()
@@ -70,15 +69,22 @@ def workflow(message: str) -> str:
 
 # --- THE AGENT: hand it tools, let it choose. --------------------------------
 def run_as_agent(message: str) -> str:
-    system = ("You are a support assistant. Use search_notes for product facts and "
-              "the calculator for any arithmetic; otherwise just answer.")
-    result = agent.run_agent(system, message, [agent.SEARCH_NOTES, agent.CALCULATOR],
-                             tracer=agent.Tracer())
+    system = (
+        "You are a support assistant. Use search_notes for product facts and "
+        "the calculator for any arithmetic; otherwise just answer."
+    )
+    result = agent.run_agent(
+        system, message, [agent.SEARCH_NOTES, agent.CALCULATOR], tracer=agent.Tracer()
+    )
     return result.answer
 
 
 if __name__ == "__main__":
-    message = sys.argv[1] if len(sys.argv) > 1 else "I was charged twice this month, can I get a refund?"
+    message = (
+        sys.argv[1]
+        if len(sys.argv) > 1
+        else "I was charged twice this month, can I get a refund?"
+    )
     print(f"Message: {message}\n")
 
     print("=== WORKFLOW (code controls the steps) ===")
