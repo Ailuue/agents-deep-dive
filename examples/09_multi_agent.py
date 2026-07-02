@@ -26,9 +26,8 @@ import sys
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from dotenv import load_dotenv
-
 import agent
+from dotenv import load_dotenv
 
 load_dotenv()
 agent.ensure_ready()
@@ -53,7 +52,12 @@ RESEARCH_TOOL = agent.Tool(
     description="Delegate a factual question about Nimbus Notes to a research specialist. Returns a concise answer.",
     parameters={
         "type": "object",
-        "properties": {"question": {"type": "string", "description": "The factual question to research"}},
+        "properties": {
+            "question": {
+                "type": "string",
+                "description": "The factual question to research",
+            }
+        },
         "required": ["question"],
     },
     func=research,
@@ -65,11 +69,17 @@ SYSTEM = (
     "results into a final answer."
 )
 
-question = sys.argv[1] if len(sys.argv) > 1 else "How much does the Plus plan cost for a full year? Research the price, then compute it."
+question = (
+    sys.argv[1]
+    if len(sys.argv) > 1
+    else "How much does the Plus plan cost for a full year? Research the price, then compute it."
+)
 print(f"Question: {question}\n")
 print("Orchestrator trace (the research tool runs its own loop inside):")
 
-result = agent.run_agent(SYSTEM, question, [agent.CALCULATOR, RESEARCH_TOOL], tracer=agent.Tracer())
+result = agent.run_agent(
+    SYSTEM, question, [agent.CALCULATOR, RESEARCH_TOOL], tracer=agent.Tracer()
+)
 
 print(f"\nFinal answer: {result.answer}")
 
