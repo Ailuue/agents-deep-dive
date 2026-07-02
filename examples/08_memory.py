@@ -23,9 +23,8 @@ import sys
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from dotenv import load_dotenv
-
 import agent
+from dotenv import load_dotenv
 
 load_dotenv()
 agent.ensure_ready()
@@ -51,7 +50,9 @@ while True:
         continue
 
     # Same `history` list every turn — that's the memory.
-    result = agent.run_agent(SYSTEM, user_input, [agent.CALCULATOR, agent.SEARCH_NOTES], history=history)
+    result = agent.run_agent(
+        SYSTEM, user_input, [agent.CALCULATOR, agent.SEARCH_NOTES], history=history
+    )
     print(f"agent> {result.answer}\n")
 
 print(
