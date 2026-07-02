@@ -175,9 +175,9 @@ tools. Sub-agents are agents wrapped as tools; that's how large systems decompos
 
 ---
 
-## Capstone — `agent.py`
+## Capstone — `agent_cli.py`
 
-**Do.** Run `python hands_on/agent.py "Save a note titled 'todo' with body 'x'"`
+**Do.** Run `python hands_on/agent_cli.py "Save a note titled 'todo' with body 'x'"`
 and deny the approval prompt. Then run it again with `--yes`. Then add `--trace` to
 either. You've now exercised the loop, the approval gate, and observability in one
 tool.
@@ -235,6 +235,35 @@ deltas via a callback; the rest of the loop (run tools, feed results back, repea
 identical. The fiddly part is reassembling the tool call: OpenAI streams the
 `arguments` as JSON *fragments* you must concatenate by index before you can parse
 them. That lives in `agent/providers.py` so the loop stays clean.
+</details>
+
+---
+
+## Section — Provider-hosted tools
+
+**Predict (`15`).** You run `examples/15_hosted_tools.py` with the hosted web-search
+tool declared. How many client-side tool rounds does *your* loop handle — and does
+that mean no search happened?
+
+<details><summary>▸ Answer</summary>
+
+Zero client-side rounds — and search *did* happen. A hosted tool is run by the
+provider *inside the turn*, not by your loop. You send one request and get one final
+answer already grounded in search; there's no tool_use/tool_result round-trip for
+your code, even though the provider ran search one or more times (the example prints
+that count). Client-executed and hosted tools are different in kind.
+</details>
+
+**Recall.** What do you give up by using a hosted tool instead of a client-executed
+one, and what do you gain?
+
+<details><summary>▸ Answer</summary>
+
+You give up **control**: the call runs on the provider's side, so Section 7's
+approval gate can't reach it, and you can't custom-log, validate, or sandbox it. You
+gain **zero plumbing** — no schema, no execution, no result round-trip. Real agents
+mix both: client tools for actions you must govern, hosted tools (web search, code
+execution) for capability you're happy to rent.
 </details>
 
 ---
