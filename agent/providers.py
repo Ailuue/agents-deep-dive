@@ -238,6 +238,62 @@ def stream_turn(system: str, history: list, tool_schema: list, on_text=None) -> 
     raise ValueError(f"Unknown PROVIDER={p!r}.")
 
 
+@dataclass
+class HostedResult:
+    """The outcome of a provider-hosted tool call (see hosted_web_search).
+
+    `text` is the final answer. `server_tool_calls` is how many times the
+    *provider* ran the tool inside the turn — proof that the work happened, even
+    though your code never saw a tool request or sent a result back."""
+
+    text: str
+    server_tool_calls: int
+
+
+def hosted_web_search(query: str) -> HostedResult:
+    """Ask the model a question with the provider's SERVER-SIDE web search tool.
+
+    Every tool in examples 01–14 is *client-executed*: the model asks, your loop
+    runs the function, you feed the result back. A hosted (server-side) tool is
+    different in kind — you declare it and the provider runs it *inside the turn*,
+    on its own infrastructure. One request goes out; one final answer comes back,
+    already grounded in live search results. There is no tool_use/tool_result
+    round-trip for your loop to manage, because the loop isn't in the middle.
+
+    That changes the mental model this repo taught: the agent loop is still the
+    core, but some tools now live on the provider's side of the wire. We return
+    how many times the provider ran search so you can see it happened.
+
+    Raises on any failure so the example can degrade gracefully (the hosted tool
+    may not be enabled for your key/model)."""
+    p = provider_name()
+    if p == "openai":
+        # The Responses API runs `web_search` server-side and returns the final
+        # text directly. Search steps appear as `web_search_call` items in the
+        # output — we count them — but you never handle a tool result yourself.
+        resp = _openai_client().responses.create(
+            model=_OPENAI_CHAT, tools=[{"type": "web_search"}], input=query
+        )
+        calls = sum(1 for item in resp.output if getattr(item, "type", "") == "web_search_call")
+        return HostedResult(text=resp.output_text, server_tool_calls=calls)
+
+    if p == "claude":
+        # Declaring the web_search tool lets Claude run it during the turn. The
+        # response interleaves `server_tool_use` / `web_search_tool_result` blocks
+        # with the text — again, no round-trip for your code.
+        resp = _anthropic_client().messages.create(
+            model=_CLAUDE_CHAT,
+            max_tokens=1024,
+            messages=[{"role": "user", "content": query}],
+            tools=[{"type": "web_search_20250305", "name": "web_search"}],
+        )
+        calls = sum(1 for b in resp.content if b.type == "server_tool_use")
+        text = "".join(b.text for b in resp.content if b.type == "text")
+        return HostedResult(text=text, server_tool_calls=calls)
+
+    raise ValueError(f"Unknown PROVIDER={p!r}.")
+
+
 def format_tool_results(results: list[tuple[str, str]]) -> list:
     """Turn (tool_call_id, result_text) pairs into provider-native messages.
 
