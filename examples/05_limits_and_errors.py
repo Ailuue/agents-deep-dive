@@ -26,9 +26,8 @@ import sys
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from dotenv import load_dotenv
-
 import agent
+from dotenv import load_dotenv
 
 load_dotenv()
 agent.ensure_ready()
@@ -39,10 +38,14 @@ SYSTEM = "You are a careful assistant. Use the calculator for arithmetic."
 # 1. Error recovery: the calculator raises on 10/0; the error goes back to the
 #    model, which then explains rather than crashing.
 print("=== error recovery (10 / 0) ===")
-r1 = agent.run_agent(SYSTEM, "What is 10 divided by 0?", [agent.CALCULATOR], tracer=agent.Tracer())
+r1 = agent.run_agent(
+    SYSTEM, "What is 10 divided by 0?", [agent.CALCULATOR], tracer=agent.Tracer()
+)
 print(f"Final answer: {r1.answer}")
 errored = any(s.result.startswith("Error") for s in r1.steps)
-print(f"(a tool returned an error mid-run: {errored} — the agent handled it, didn't crash)")
+print(
+    f"(a tool returned an error mid-run: {errored} — the agent handled it, didn't crash)"
+)
 
 # 2. Step limit: a task that needs several calls, capped at 1 step.
 print("\n=== step limit (max_steps=1 on a multi-step task) ===")
@@ -54,7 +57,9 @@ r2 = agent.run_agent(
     tracer=agent.Tracer(),
 )
 print(f"Final answer: {r2.answer}")
-print(f"(stopped early: {r2.stopped_early} — the ceiling protected you from an unbounded loop)")
+print(
+    f"(stopped early: {r2.stopped_early} — the ceiling protected you from an unbounded loop)"
+)
 
 print(
     "\nThese two knobs — a hard step cap and feeding errors back as results — are "
