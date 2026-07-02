@@ -84,12 +84,14 @@ class MCPClient:
         tools = []
         for desc in self.list_tools():
             name = desc["name"]
-            tools.append(Tool(
-                name=name,
-                description=desc["description"],
-                parameters=desc["inputSchema"],  # MCP's key for the JSON Schema
-                func=lambda _name=name, **kwargs: self.call_tool(_name, kwargs),
-            ))
+            tools.append(
+                Tool(
+                    name=name,
+                    description=desc["description"],
+                    parameters=desc["inputSchema"],  # MCP's key for the JSON Schema
+                    func=lambda _name=name, **kwargs: self.call_tool(_name, kwargs),
+                )
+            )
         return tools
 
     def close(self) -> None:
@@ -107,9 +109,14 @@ def main() -> None:
             print(f"  • {tool.name} — {tool.description}")
 
         print("\nCalling tools over the protocol (the agent never imported them):\n")
-        print("  calculator(expression='6 * 7') ->", client.call_tool("calculator", {"expression": "6 * 7"}))
+        print(
+            "  calculator(expression='6 * 7') ->",
+            client.call_tool("calculator", {"expression": "6 * 7"}),
+        )
         print("  search_notes(query='what plans are offered') ->")
-        for line in client.call_tool("search_notes", {"query": "what plans are offered"}).splitlines():
+        for line in client.call_tool(
+            "search_notes", {"query": "what plans are offered"}
+        ).splitlines():
             print("     ", line)
 
         print("\nThese came back as ordinary Tool objects:")
