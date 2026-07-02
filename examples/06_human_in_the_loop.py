@@ -25,9 +25,8 @@ import sys
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from dotenv import load_dotenv
-
 import agent
+from dotenv import load_dotenv
 
 load_dotenv()
 agent.ensure_ready()
@@ -36,7 +35,7 @@ print(f"Provider: {agent.describe()}\n")
 
 def approve(call: agent.ToolCall) -> bool:
     """Ask the human before a dangerous tool runs. Return True to allow."""
-    print(f"\n  [approval needed] the agent wants to run:")
+    print("\n  [approval needed] the agent wants to run:")
     print(f"      {call.name}({call.arguments})")
     answer = input("  Allow this? [y/N] ").strip().lower()
     return answer in ("y", "yes")
@@ -47,15 +46,23 @@ SYSTEM = (
     "to remember or save something, use the save_note tool."
 )
 
-question = sys.argv[1] if len(sys.argv) > 1 else "Please save a note titled 'Shopping list' with body 'milk, eggs, bread'."
+question = (
+    sys.argv[1]
+    if len(sys.argv) > 1
+    else "Please save a note titled 'Shopping list' with body 'milk, eggs, bread'."
+)
 print(f"Question: {question}")
 
-result = agent.run_agent(SYSTEM, question, agent.default_tools(), approve=approve, tracer=agent.Tracer())
+result = agent.run_agent(
+    SYSTEM, question, agent.default_tools(), approve=approve, tracer=agent.Tracer()
+)
 
 print(f"\nFinal answer: {result.answer}")
 denied = any(not s.approved for s in result.steps)
 if denied:
-    print("(you denied a tool call — notice the agent acknowledged it instead of forcing it)")
+    print(
+        "(you denied a tool call — notice the agent acknowledged it instead of forcing it)"
+    )
 
 print(
     "\nApproval gating is how you keep a human in control of the actions that "
