@@ -17,7 +17,15 @@ Typical use:
 """
 
 from .loop import AgentResult, Step, Tracer, run_agent
-from .providers import ToolCall, Turn, describe, ensure_ready, provider_name
+from .providers import (
+    HostedResult,
+    ToolCall,
+    Turn,
+    describe,
+    ensure_ready,
+    hosted_web_search,
+    provider_name,
+)
 from .tools import (
     CALCULATOR,
     SAVE_NOTE,
@@ -38,6 +46,8 @@ __all__ = [
     "Tracer",
     "ToolCall",
     "Turn",
+    "HostedResult",
+    "hosted_web_search",
     "provider_name",
     "describe",
     "ensure_ready",
