@@ -222,7 +222,7 @@ built — focused agents calling each other through the same tool interface.
 
 ---
 
-## 11. The capstone: `agent.py`
+## 11. The capstone: `agent_cli.py`
 
 Everything assembled into a CLI agent you can actually use: the full toolbox, the
 loop with a step cap, approval for the dangerous tool, an optional trace, and a
@@ -230,19 +230,19 @@ memory-keeping interactive mode.
 
 ```bash
 # One-off task
-python hands_on/agent.py "What's a year of the Plus plan, and is offline editing included?"
+python hands_on/agent_cli.py "What's a year of the Plus plan, and is offline editing included?"
 
 # Watch every step
-python hands_on/agent.py "What is 19% of 240?" --trace
+python hands_on/agent_cli.py "What is 19% of 240?" --trace
 
 # Interactive chat with memory (type 'quit' to exit)
-python hands_on/agent.py
+python hands_on/agent_cli.py
 
 # Save notes without being prompted each time
-python hands_on/agent.py "Save a note titled 'todo' with body 'ship the repo'" --yes
+python hands_on/agent_cli.py "Save a note titled 'todo' with body 'ship the repo'" --yes
 ```
 
-Read [hands_on/agent.py](hands_on/agent.py) — it's just the library wired to a CLI.
+Read [hands_on/agent_cli.py](hands_on/agent_cli.py) — it's just the library wired to a CLI.
 **Suggested exercise:** add a new tool to `agent/tools.py` (say `word_count`),
 register it in `default_tools()`, and watch the agent pick it up. Adding a
 capability is: write a function, describe it, register it.
@@ -293,6 +293,20 @@ bit, kept in `agent/providers.py`). This is the pattern most production assistan
 python examples/14_streaming_tool_loop.py
 ```
 
+### Provider-hosted tools — the loop never sees it
+Every tool so far was **client-executed**: the model asks, *your* loop runs the
+function, you feed the result back. A **hosted** tool is different in kind — you
+*declare* it and the provider runs it *inside the turn*, on its own infrastructure.
+You send one request and get one final answer; there's no tool_use/tool_result
+round-trip for your loop to manage, because your loop isn't in the middle. The
+example asks a question with hosted **web search** declared and shows the gap:
+search really ran (the provider did it), but your code handled **zero** tool rounds.
+The tradeoff is control for plumbing — a hosted tool can't be gated (Section 7),
+custom-logged, or sandboxed, but it needs no glue. Real agents mix both.
+```bash
+python examples/15_hosted_tools.py       # small real call; degrades cleanly if the tool isn't enabled
+```
+
 ---
 
 ## Bonus — MCP: a tool you didn't ship with
@@ -332,6 +346,11 @@ equivalent. The protocol shape you just built by hand is exactly what those use.
 You've built a real agent from scratch. The frontier is more of the same loop, with
 more capability and rigor:
 
+- **Build on a harness** — the whole next step. Most agent work in 2026 is building
+  *on* a harness (hooks, permission policies, sandboxing, subagents, headless runs)
+  rather than hand-rolling the loop. The **[Agent Harnesses dive](https://github.com/Ailuue/agent-harness-deep-dive)**
+  builds one from scratch and covers when to throw away your loop for the SDK,
+  plus computer use and hosted sandboxes.
 - **MCP at scale** — you built the protocol by hand above; the official `mcp` SDK,
   remote (HTTP/SSE) transports, auth, and provider-side connectors are the
   production version.
@@ -390,7 +409,7 @@ agent/                      ← the from-scratch agent library (read it!)
   loop.py                   ← run_agent (the loop) + Tracer + AgentResult
   mcp_server.py             ← a from-scratch MCP tool server (JSON-RPC over stdio)
 hands_on/
-  agent.py                  ← capstone: a CLI agent (one-off or interactive)
+  agent_cli.py              ← capstone: a CLI agent (one-off or interactive)
 examples/
   01_tools.py               ← what a tool is (offline, no key)
   02_one_tool_call.py       ← one turn: the model requests a tool call
@@ -406,6 +425,7 @@ examples/
   12_planning_reflection.py ← plan before acting; reflect & revise after
   13_parallel_and_streaming.py ← run independent tool calls concurrently; stream the answer
   14_streaming_tool_loop.py    ← stream every turn (incl. tool turns), not just the final answer
+  15_hosted_tools.py        ← a provider-hosted tool (web search): the provider runs it inside the turn
 ```
 
 (`workspace/` is created by the `save_note` tool and is git-ignored.)
@@ -454,5 +474,7 @@ this sequence builds naturally:
 - [Fine-tuning](https://github.com/Ailuue/fine-tuning-deep-dive) — teach a model new behavior by example
 - [MCP](https://github.com/Ailuue/mcp-deep-dive) — serve tools, data & prompts to any LLM over a standard protocol
 - [Local Models](https://github.com/Ailuue/local-models-deep-dive) — run open-weight models on your own machine
+- [Agent Harnesses](https://github.com/Ailuue/agent-harness-deep-dive) — build on the loop: hooks, permissions, sandboxing, subagents
+- [Realtime Voice](https://github.com/Ailuue/realtime-voice-deep-dive) — low-latency speech-to-speech agents
 
 **You are here: #6 — Agents.**
