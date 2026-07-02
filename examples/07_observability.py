@@ -22,9 +22,8 @@ import sys
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from dotenv import load_dotenv
-
 import agent
+from dotenv import load_dotenv
 
 load_dotenv()
 agent.ensure_ready()
@@ -34,11 +33,15 @@ SYSTEM = (
     "You are a Nimbus Notes assistant. Use search_notes for product facts and the "
     "calculator for arithmetic."
 )
-question = "What's the price gap per year between the Plus and Team plans, for one user?"
+question = (
+    "What's the price gap per year between the Plus and Team plans, for one user?"
+)
 print(f"Question: {question}\n")
 
 print("Live trace:")
-result = agent.run_agent(SYSTEM, question, [agent.CALCULATOR, agent.SEARCH_NOTES], tracer=agent.Tracer())
+result = agent.run_agent(
+    SYSTEM, question, [agent.CALCULATOR, agent.SEARCH_NOTES], tracer=agent.Tracer()
+)
 
 print(f"\nFinal answer: {result.answer}")
 
