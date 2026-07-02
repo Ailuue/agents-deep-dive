@@ -31,12 +31,16 @@ from agent.tools import calculator, search_notes
 # 1. Tools are just functions. Call them yourself — no model, no key.
 print("Calling the tools directly (this is what the model can ask you to run):")
 print(f"  calculator('12 * (3 + 4)')              -> {calculator('12 * (3 + 4)')}")
-print(f"  search_notes('how long are deleted notes kept') ->\n      {search_notes('how long are deleted notes kept')!r}")
+print(
+    f"  search_notes('how long are deleted notes kept') ->\n      {search_notes('how long are deleted notes kept')!r}"
+)
 
 # 2. This is all the model sees about a tool — the "menu." It picks from this.
 print("\nWhat the model receives (the tool schema it chooses from):")
 schema = providers.to_tool_schema([agent.CALCULATOR])
+schema2 = providers.to_tool_schema([agent.SEARCH_NOTES])
 print(json.dumps(schema[0], indent=2))
+print(json.dumps(schema2[0], indent=2))
 
 print(
     "\nThe description and parameter names are the model's only clues for *when* "
