@@ -22,10 +22,9 @@ import sys
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from dotenv import load_dotenv
-
 import agent
 from agent import providers
+from dotenv import load_dotenv
 
 load_dotenv()
 agent.ensure_ready()
@@ -36,13 +35,15 @@ schema = providers.to_tool_schema(tools)
 history = [providers.user_message("What is 23 * 47?")]
 
 # One assistant turn. The shim normalizes both providers to the same Turn shape.
-turn = providers.run_turn("You are a helpful assistant. Use tools for arithmetic.", history, schema)
+turn = providers.run_turn(
+    "You are a helpful assistant. Use tools for arithmetic.", history, schema
+)
 
 if not turn.tool_calls:
     print(f"The model answered directly (no tool call): {turn.text}")
 else:
     call = turn.tool_calls[0]
-    print(f"The model did NOT answer. It requested a tool call:")
+    print("The model did NOT answer. It requested a tool call:")
     print(f"  tool: {call.name}")
     print(f"  args: {call.arguments}")
     print(f"  id:   {call.id}")
